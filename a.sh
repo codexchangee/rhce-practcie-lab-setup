@@ -76,6 +76,46 @@ sudo chmod -R 755 /var/www/html/files
 
 sudo systemctl restart httpd
 
+
+
+
+###########################################
+# FIX NODE1: REMOVE python3-pyOpenSSL
+############################################
+
+echo "Fixing node1: Removing python3-pyOpenSSL..."
+
+sshpass -p "$ROOT_PASSWORD" ssh -o StrictHostKeyChecking=no root@172.25.250.10 <<EOF
+sudo dnf remove -y python3-pyOpenSSL
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "python3-pyOpenSSL removed successfully from node1"
+else
+    echo "Failed to remove python3-pyOpenSSL from node1"
+fi
+
+
+############################################
+# FIX NODE3: REMOVE nginx
+############################################
+
+echo "Fixing node3: Removing nginx..."
+
+sshpass -p "$ROOT_PASSWORD" ssh -o StrictHostKeyChecking=no root@172.25.250.220 <<EOF
+yum remove nginx -y
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "nginx removed successfully from node3"
+else
+    echo "Failed to remove nginx from node3"
+fi
+
+
+
+
+
 echo "Opening browser..."
 xdg-open http://localhost/files 2>/dev/null
 
