@@ -1,0 +1,16 @@
+---
+- name: use template
+  hosts: all
+  tasks:
+    - name: use template
+      template:
+        src: ./hosts.j2
+        dest: /etc/myhosts
+
+- name: delete from all
+  hosts: all,!dev
+  tasks:
+    - name: delete file
+      file:
+        path: /etc/myhosts
+        state: absent
