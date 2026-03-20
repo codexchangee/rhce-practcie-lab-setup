@@ -8,7 +8,7 @@ It automatically configures the lab environment, installs required services, dep
 Run the following single command on your RHCE lab machine:
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-bash -c 'curl -L https://raw.githubusercontent.com/codexchangee/rhce-practcie-lab-setup/main/a.sh | sudo bash'
+bash -c 'curl -L https://raw.githubusercontent.com/codexchangee/rhce-practcie-lab-setup/main/b.sh | sudo bash'
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ✅ What This Script Does Automatically
