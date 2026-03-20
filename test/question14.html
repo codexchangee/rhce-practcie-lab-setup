@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Task 13 - Create Users from Variable File</title>
+<script>/* timer */ (function(){ const DURATION_SECONDS=90*60; const STORAGE_KEY="examEndTime_90m_v2"; function startTimer(durationSeconds, display){ let endTime=parseInt(localStorage.getItem(STORAGE_KEY)||"0",10); const now=Date.now(); if(!endTime||endTime<=now||endTime-now>durationSeconds*1000+5000){ endTime=now+durationSeconds*1000; localStorage.setItem(STORAGE_KEY,String(endTime)); } function updateTimer(){ const remainingMs=Math.max(0,endTime-Date.now()); const remaining=Math.floor(remainingMs/1000); const hours=Math.floor(remaining/3600); const minutes=Math.floor((remaining%3600)/60); display.textContent=hours+":"+(minutes<10?"0":"")+minutes; if(remaining<=15*60) display.classList.add("red"); else display.classList.remove("red"); if(remaining>0) setTimeout(updateTimer,1000); else display.textContent="0:00"; } updateTimer(); } window.onload=function(){ const display=document.querySelector("#countdown"); if(display) startTimer(DURATION_SECONDS,display); }; })();</script>
+  <style>body{margin:0;font-family:Arial, sans-serif;background-color:#ffffcc;display:flex}.sidebar{width:220px;background-color:#ffffcc;border-right:2px solid #ccc;text-align:center;padding:20px}.content{flex:1;padding:20px}.timer{font-weight:bold;font-size:18px;margin-top:20px}.timer.red{color:red}</style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="exam-title">Red Hat<br/>Test Exam</div>
+    <div class="timer">Time remaining: <span id="countdown">1:30</span></div>
+    <a href="#" class="lang-link">Select Language</a>
+    <p>Task 13 of 17</p>
+  </div>
+
+  <div class="content">
+    <h2>Download user_list.yml and create users using variables</h2>
+    <p>Playbook <code>users.yml</code> should run using <code>user_list.yml</code> and <code>vault.yml</code> and do the following:</p>
+    <ol>
+      <li>Create group <code>opsdev</code>. Create users from the users variable whose job is <code>developer</code> and add them to <code>opsdev</code>. Assign password using SHA512 using <code>{{ pw_developer }}</code>. Run on <code>dev</code> and <code>test</code> groups.</li>
+      <li>Create group <code>opsmgr</code>. Create users whose job is <code>manager</code> and add them to <code>opsmgr</code>. Assign password using SHA512 using <code>{{ pw_manager }}</code>. Run on <code>prod</code> group.</li>
+      <li>Use <code>when</code> conditions appropriately for each play.</li>
+    </ol>
+
+    <center><button onclick="history.back()">Back</button></center>
+    <hr><center><button>Provide feedback on this item</button></center>
+  </div>
+</body>
+</html>
