@@ -92,13 +92,13 @@ WORKDIR=$(mktemp -d)
 
 echo "Downloading files from GitHub..."
 
-curl -L "$URL" -o "$WORKDIR/repo.tar.gz"
+curl -L "$URL" -o $WORKDIR/repo.tar.gz
 
 echo "Extracting..."
 
-tar -xzf "$WORKDIR/repo.tar.gz" -C "$WORKDIR"
+tar -xzf $WORKDIR/repo.tar.gz -C $WORKDIR
 
-EXTRACTED=$(find "$WORKDIR" -maxdepth 1 -type d -name "${GITHUB_REPO}-*")
+EXTRACTED=$(find $WORKDIR -maxdepth 1 -type d -name "${GITHUB_REPO}-*")
 
 
 ###########################################
@@ -107,113 +107,62 @@ EXTRACTED=$(find "$WORKDIR" -maxdepth 1 -type d -name "${GITHUB_REPO}-*")
 
 echo "Setting up web content..."
 
-# Clean old content
 sudo rm -rf /var/www/html/*
-
 sudo mkdir -p /var/www/html/files
 
 
-# Copy HTML files → /
+###########################################
+# COPY HTML FILES
+###########################################
+
 echo "Copying HTML files..."
 
-sudo find "$EXTRACTED/test" \
+sudo find $EXTRACTED/test \
     -type f \
     -name "*.html" \
     -exec cp {} /var/www/html/ \;
 
 
-# Copy lab files → /files
+###########################################
+# COPY LAB FILES
+#
+# RHEL SYSTEM ROLES TAR IS EXCLUDED
+###########################################
+
 echo "Copying lab files..."
 
-sudo cp -r "$EXTRACTED/files/"* /var/www/html/files/
+find "$EXTRACTED/files" -maxdepth 1 -type f \
+    ! -name "redhat-rhel_system_roles-1.19.3.tar.gz" \
+    -exec sudo cp {} /var/www/html/files/ \;
 
 
 ###########################################
 # RHEL SYSTEM ROLES
 ###########################################
 
-echo "Setting up RHEL System Roles..."
+echo "Creating RHEL System Roles directory..."
 
-SYSTEM_ROLES_ARCHIVE="/home/student/redhat-rhel_system_roles-1.19.3.tar.gz"
+sudo mkdir -p /var/www/html/index/rhel-system-roles
 
-if [ ! -f "$SYSTEM_ROLES_ARCHIVE" ]; then
+SYSTEM_ROLES="$EXTRACTED/files/redhat-rhel_system_roles-1.19.3.tar.gz"
 
-    echo "ERROR: RHEL System Roles archive was not found:"
-    echo "$SYSTEM_ROLES_ARCHIVE"
-    echo ""
-    echo "Please place the file at:"
-    echo "/home/student/redhat-rhel_system_roles-1.19.3.tar.gz"
-    echo ""
+if [ -f "$SYSTEM_ROLES" ]; then
 
-    exit 1
+    echo "Extracting RHEL System Roles..."
 
-fi
+    sudo tar -xzf "$SYSTEM_ROLES" \
+        -C /var/www/html/index/rhel-system-roles \
+        --strip-components=1
 
-
-UTILITY_IP="172.25.250.220"
-
-echo "Copying RHEL System Roles archive to utility..."
-
-sshpass -p "$ROOT_PASSWORD" scp \
-    -o StrictHostKeyChecking=no \
-    "$SYSTEM_ROLES_ARCHIVE" \
-    root@$UTILITY_IP:/tmp/rhel-system-roles.tar.gz
-
-
-echo "Extracting RHEL System Roles on utility..."
-
-sshpass -p "$ROOT_PASSWORD" ssh \
-    -o StrictHostKeyChecking=no \
-    root@$UTILITY_IP <<'EOF'
-
-set -e
-
-ROLE_WEB_DIR="/var/www/html/index/rhel-system-roles"
-ROLE_TMP_DIR="/tmp/rhel-system-roles-extract"
-
-rm -rf "$ROLE_WEB_DIR"
-rm -rf "$ROLE_TMP_DIR"
-
-mkdir -p "$ROLE_WEB_DIR"
-mkdir -p "$ROLE_TMP_DIR"
-
-tar -xzf /tmp/rhel-system-roles.tar.gz \
-    -C "$ROLE_TMP_DIR"
-
-
-# Handle archive with a top-level directory
-TOP_DIR=$(find "$ROLE_TMP_DIR" \
-    -mindepth 1 \
-    -maxdepth 1 \
-    -type d \
-    | head -n 1)
-
-
-if [ -n "$TOP_DIR" ] && [ -d "$TOP_DIR/roles" ]; then
-
-    cp -a "$TOP_DIR"/. "$ROLE_WEB_DIR"/
+    echo "RHEL System Roles extracted successfully."
 
 else
 
-    cp -a "$ROLE_TMP_DIR"/. "$ROLE_WEB_DIR"/
+    echo "ERROR: RHEL System Roles archive not found:"
+    echo "$SYSTEM_ROLES"
+    exit 1
 
 fi
-
-
-# Remove temporary archive
-rm -f /tmp/rhel-system-roles.tar.gz
-
-# Remove temporary extraction directory
-rm -rf "$ROLE_TMP_DIR"
-
-
-# Web permissions
-chown -R apache:apache "$ROLE_WEB_DIR"
-chmod -R 755 "$ROLE_WEB_DIR"
-
-echo "RHEL System Roles installed successfully."
-
-EOF
 
 
 ###########################################
@@ -221,113 +170,93 @@ EOF
 ###########################################
 
 sudo chown -R apache:apache /var/www/html
-
 sudo chmod -R 755 /var/www/html
 
 
 ###########################################
-# SELINUX (PERSISTENT FIX)
+# SELINUX
 ###########################################
 
 echo "Configuring SELinux..."
 
 sudo dnf install -y policycoreutils-python-utils
 
-
-# Main web content
 sudo semanage fcontext -a \
     -t httpd_sys_content_t \
     "/var/www/html(/.*)?" 2>/dev/null || true
 
-
-# Files directory
 sudo semanage fcontext -a \
     -t httpd_sys_content_t \
     "/var/www/html/files(/.*)?" 2>/dev/null || true
 
-
-# Apply context
 sudo restorecon -Rv /var/www/html
 
 
 ###########################################
-# GIT SERVER SETUP
+# GIT SETUP
 ###########################################
 
 echo "======================================="
-echo "Setting up Git server..."
+echo "Setting up Git..."
 echo "======================================="
 
 
-echo "Installing Git on utility..."
+# Create local Ansible directory
+
+sudo mkdir -p /home/student/ansible
+sudo chown -R student:student /home/student/ansible
+
+
+# Initialize local Git repository
+
+if [ ! -d /home/student/ansible/.git ]; then
+
+    sudo -u student git \
+        -C /home/student/ansible \
+        init
+
+fi
+
+
+# Git identity
+
+sudo -u student git \
+    -C /home/student/ansible \
+    config user.name "student"
+
+sudo -u student git \
+    -C /home/student/ansible \
+    config user.email "student@lab.example.com"
+
+
+###########################################
+# CREATE GIT SERVER ON UTILITY
+###########################################
+
+echo "Creating Git repository on utility..."
 
 sshpass -p "$ROOT_PASSWORD" ssh \
     -o StrictHostKeyChecking=no \
-    root@$UTILITY_IP <<'EOF'
+    root@172.25.250.220 <<EOF
 
-set -e
+dnf install -y git
 
-dnf install -y git openssh-server
+mkdir -p /var/lib/git/ansible.git
 
-systemctl enable --now sshd
-
-
-# Create git user
-id git >/dev/null 2>&1 || useradd -m -d /home/git -s /usr/bin/git-shell git
-
-
-# Make sure git-shell exists
-GIT_SHELL=$(command -v git-shell)
-
-if ! grep -q "^${GIT_SHELL}$" /etc/shells; then
-    echo "$GIT_SHELL" >> /etc/shells
+if [ ! -f /var/lib/git/ansible.git/HEAD ]; then
+    git init --bare /var/lib/git/ansible.git
 fi
-
-usermod -s "$GIT_SHELL" git
-
-
-# Git repository directory
-mkdir -p /var/lib/git
-
-chown git:git /var/lib/git
-
-
-# Create bare repository
-if [ ! -d /var/lib/git/ansible.git ]; then
-
-    sudo -u git git init --bare /var/lib/git/ansible.git
-
-fi
-
-
-# SSH directory for git user
-mkdir -p /home/git/.ssh
-
-chmod 700 /home/git/.ssh
-
-touch /home/git/.ssh/authorized_keys
-
-chmod 600 /home/git/.ssh/authorized_keys
-
-chown -R git:git /home/git/.ssh
 
 EOF
 
 
 ###########################################
-# CREATE STUDENT SSH KEY FOR GIT
+# CREATE SSH KEY FOR STUDENT
 ###########################################
 
-echo "Creating SSH key for student..."
-
-sudo -u student mkdir -p /home/student/.ssh
-
-sudo chmod 700 /home/student/.ssh
-
-sudo chown -R student:student /home/student/.ssh
-
-
 if [ ! -f /home/student/.ssh/id_ed25519 ]; then
+
+    sudo -u student mkdir -p /home/student/.ssh
 
     sudo -u student ssh-keygen \
         -t ed25519 \
@@ -338,91 +267,17 @@ fi
 
 
 ###########################################
-# INSTALL STUDENT PUBLIC KEY ON GIT SERVER
+# AUTHORIZE STUDENT KEY ON UTILITY
 ###########################################
 
-echo "Installing student SSH key on Git server..."
+echo "Configuring Git SSH access..."
 
-sshpass -p "$ROOT_PASSWORD" scp \
-    -o StrictHostKeyChecking=no \
-    /home/student/.ssh/id_ed25519.pub \
-    root@$UTILITY_IP:/tmp/student_git_key.pub
-
+PUBKEY=$(cat /home/student/.ssh/id_ed25519.pub)
 
 sshpass -p "$ROOT_PASSWORD" ssh \
     -o StrictHostKeyChecking=no \
-    root@$UTILITY_IP <<'EOF'
-
-set -e
-
-mkdir -p /home/git/.ssh
-
-cat /tmp/student_git_key.pub >> /home/git/.ssh/authorized_keys
-
-rm -f /tmp/student_git_key.pub
-
-chmod 700 /home/git/.ssh
-chmod 600 /home/git/.ssh/authorized_keys
-
-chown -R git:git /home/git/.ssh
-
-EOF
-
-
-###########################################
-# CREATE STUDENT ANSIBLE DIRECTORY
-###########################################
-
-echo "Creating /home/student/ansible..."
-
-sudo mkdir -p /home/student/ansible
-
-sudo chown -R student:student /home/student/ansible
-
-
-###########################################
-# INITIALIZE LOCAL GIT REPOSITORY
-###########################################
-
-echo "Initializing Git repository..."
-
-if [ ! -d /home/student/ansible/.git ]; then
-
-    sudo -u student bash -c \
-        'cd /home/student/ansible && git init'
-
-fi
-
-
-###########################################
-# CONFIGURE GIT USER
-###########################################
-
-sudo -u student git \
-    -C /home/student/ansible \
-    config user.name "student"
-
-
-sudo -u student git \
-    -C /home/student/ansible \
-    config user.email "student@lab.example.com"
-
-
-###########################################
-# CONFIGURE SSH FOR GIT
-###########################################
-
-sudo -u student bash -c 'cat > /home/student/.ssh/config <<EOF
-Host utility-git
-    HostName 172.25.250.220
-    User git
-    IdentityFile /home/student/.ssh/id_ed25519
-    StrictHostKeyChecking no
-EOF'
-
-sudo chmod 600 /home/student/.ssh/config
-
-sudo chown student:student /home/student/.ssh/config
+    root@172.25.250.220 \
+    "mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo '$PUBKEY' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
 
 
 ###########################################
@@ -433,61 +288,47 @@ sudo -u student git \
     -C /home/student/ansible \
     remote remove origin 2>/dev/null || true
 
-
 sudo -u student git \
     -C /home/student/ansible \
     remote add origin \
-    git@utility-git:/var/lib/git/ansible.git
+    root@172.25.250.220:/var/lib/git/ansible.git
 
 
 ###########################################
-# TEST GIT UPLOAD
+# GIT TEST FILE
 ###########################################
 
-echo "Testing Git upload..."
+sudo -u student bash -c \
+    'echo "# RHEL RHCE Practice Lab" > /home/student/ansible/README.md'
 
-if [ ! -f /home/student/ansible/README.md ]; then
 
-    sudo -u student bash -c \
-        'echo "# RHEL 10 RHCE Practice Lab" > /home/student/ansible/README.md'
-
-fi
-
+###########################################
+# COMMIT
+###########################################
 
 sudo -u student git \
     -C /home/student/ansible \
-    add .
+    add README.md
 
-
-if sudo -u student git \
+sudo -u student git \
     -C /home/student/ansible \
-    diff --cached --quiet; then
-
-    echo "Nothing new to commit."
-
-else
-
-    sudo -u student git \
-        -C /home/student/ansible \
-        commit -m "Initial RHEL 10 RHCE lab setup"
-
-fi
+    commit -m "Initial lab repository"
 
 
-# Push only if there is a commit
-if sudo -u student git \
+###########################################
+# PUSH
+###########################################
+
+sudo -u student git \
     -C /home/student/ansible \
-    rev-parse HEAD >/dev/null 2>&1; then
+    branch -M main
 
-    sudo -u student git \
-        -C /home/student/ansible \
-        branch -M main
+sudo -u student git \
+    -C /home/student/ansible \
+    push -u origin main
 
-    sudo -u student git \
-        -C /home/student/ansible \
-        push -u origin main --force
 
-fi
+echo "Git repository test completed successfully."
 
 
 ###########################################
@@ -534,7 +375,6 @@ EOF
 echo "Opening browser..."
 
 xdg-open http://localhost 2>/dev/null
-
 xdg-open http://localhost/files 2>/dev/null
 
 
@@ -553,12 +393,9 @@ echo "Lab Files:"
 echo "http://localhost/files"
 echo ""
 echo "RHEL System Roles:"
-echo "http://utility.lab.example.com/index/rhel-system-roles/"
+echo "http://localhost/index/rhel-system-roles/"
 echo ""
-echo "Git Repository:"
-echo "git@utility-git:/var/lib/git/ansible.git"
-echo ""
-echo "Local Ansible Directory:"
+echo "Git:"
 echo "/home/student/ansible"
 echo ""
 echo "======================================="
