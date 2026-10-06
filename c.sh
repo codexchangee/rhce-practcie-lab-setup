@@ -121,8 +121,6 @@ echo "Installing required workstation packages..."
 
 sudo dnf install -y \
     ansible-core \
-    ansible \
-    ansible.posix \
     sshpass \
     git \
     curl \
