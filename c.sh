@@ -92,13 +92,13 @@ WORKDIR=$(mktemp -d)
 
 echo "Downloading files from GitHub..."
 
-curl -L "$URL" -o $WORKDIR/repo.tar.gz
+curl -L "$URL" -o "$WORKDIR/repo.tar.gz"
 
 echo "Extracting..."
 
-tar -xzf $WORKDIR/repo.tar.gz -C $WORKDIR
+tar -xzf "$WORKDIR/repo.tar.gz" -C "$WORKDIR"
 
-EXTRACTED=$(find $WORKDIR -maxdepth 1 -type d -name "${GITHUB_REPO}-*")
+EXTRACTED=$(find "$WORKDIR" -maxdepth 1 -type d -name "${GITHUB_REPO}-*" | head -n1)
 
 
 ###########################################
@@ -109,6 +109,7 @@ echo "Setting up web content..."
 
 sudo rm -rf /var/www/html/*
 sudo mkdir -p /var/www/html/files
+sudo mkdir -p /var/www/html/index/rhel-system-roles
 
 
 ###########################################
@@ -117,7 +118,7 @@ sudo mkdir -p /var/www/html/files
 
 echo "Copying HTML files..."
 
-sudo find $EXTRACTED/test \
+sudo find "$EXTRACTED/test" \
     -type f \
     -name "*.html" \
     -exec cp {} /var/www/html/ \;
@@ -125,41 +126,36 @@ sudo find $EXTRACTED/test \
 
 ###########################################
 # COPY LAB FILES
-#
-# RHEL SYSTEM ROLES TAR IS EXCLUDED
 ###########################################
 
 echo "Copying lab files..."
 
 find "$EXTRACTED/files" -maxdepth 1 -type f \
-    ! -name "redhat-rhel_system_roles-1.19.3.tar.gz" \
     -exec sudo cp {} /var/www/html/files/ \;
 
 
 ###########################################
-# RHEL SYSTEM ROLES
+# COPY RHEL SYSTEM ROLES DIRECTORY
 ###########################################
 
-echo "Creating RHEL System Roles directory..."
+echo "Copying RHEL System Roles directory..."
 
-sudo mkdir -p /var/www/html/index/rhel-system-roles
+if [ -d "$EXTRACTED/files/rhel-system-roles" ]; then
 
-SYSTEM_ROLES="$EXTRACTED/files/redhat-rhel_system_roles-1.19.3.tar.gz"
+    sudo cp -a \
+        "$EXTRACTED/files/rhel-system-roles" \
+        /var/www/html/files/
 
-if [ -f "$SYSTEM_ROLES" ]; then
+    sudo cp -a \
+        "$EXTRACTED/files/rhel-system-roles/." \
+        /var/www/html/index/rhel-system-roles/
 
-    echo "Extracting RHEL System Roles..."
-
-    sudo tar -xzf "$SYSTEM_ROLES" \
-        -C /var/www/html/index/rhel-system-roles \
-        --strip-components=1
-
-    echo "RHEL System Roles extracted successfully."
+    echo "RHEL System Roles directory copied successfully."
 
 else
 
-    echo "ERROR: RHEL System Roles archive not found:"
-    echo "$SYSTEM_ROLES"
+    echo "ERROR: rhel-system-roles directory not found:"
+    echo "$EXTRACTED/files/rhel-system-roles"
     exit 1
 
 fi
@@ -277,7 +273,7 @@ PUBKEY=$(cat /home/student/.ssh/id_ed25519.pub)
 sshpass -p "$ROOT_PASSWORD" ssh \
     -o StrictHostKeyChecking=no \
     root@172.25.250.220 \
-    "mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo '$PUBKEY' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+    "mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && grep -qxF '$PUBKEY' /root/.ssh/authorized_keys || echo '$PUBKEY' >> /root/.ssh/authorized_keys"
 
 
 ###########################################
@@ -293,7 +289,11 @@ sudo -u student git \
     remote add origin \
     root@172.25.250.220:/var/lib/git/ansible.git
 
-# RHEL location of Git server programs
+
+###########################################
+# FIX RHEL GIT RECEIVE-PACK PATH
+###########################################
+
 sudo -u student git \
     -C /home/student/ansible \
     config remote.origin.receivepack \
@@ -323,7 +323,7 @@ sudo -u student git \
 
 sudo -u student git \
     -C /home/student/ansible \
-    commit -m "Initial lab repository"
+    commit -m "Initial lab repository" || true
 
 
 ###########################################
@@ -387,6 +387,7 @@ echo "Opening browser..."
 
 xdg-open http://localhost 2>/dev/null
 xdg-open http://localhost/files 2>/dev/null
+xdg-open http://localhost/files/rhel-system-roles/ 2>/dev/null
 
 
 ###########################################
@@ -404,7 +405,7 @@ echo "Lab Files:"
 echo "http://localhost/files"
 echo ""
 echo "RHEL System Roles:"
-echo "http://localhost/index/rhel-system-roles/"
+echo "http://localhost/files/rhel-system-roles/"
 echo ""
 echo "Git:"
 echo "/home/student/ansible"
