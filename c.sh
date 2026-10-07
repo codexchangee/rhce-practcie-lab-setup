@@ -293,6 +293,17 @@ sudo -u student git \
     remote add origin \
     root@172.25.250.220:/var/lib/git/ansible.git
 
+# RHEL location of Git server programs
+sudo -u student git \
+    -C /home/student/ansible \
+    config remote.origin.receivepack \
+    /usr/libexec/git-core/git-receive-pack
+
+sudo -u student git \
+    -C /home/student/ansible \
+    config remote.origin.uploadpack \
+    /usr/libexec/git-core/git-upload-pack
+
 
 ###########################################
 # GIT TEST FILE
