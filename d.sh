@@ -2,7 +2,7 @@
 
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run with sudo."
-    echo "Run: sudo bash b.sh"
+    echo "Run: sudo bash d.sh"
     exit 1
 fi
 
